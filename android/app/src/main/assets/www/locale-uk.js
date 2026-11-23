@@ -11,6 +11,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.phoneMic.setupFailed": "Не вдалося зв'язатися з агентом.",
       "s.phoneMic.startMuted": "Запускати без звуку",
       "s.phoneMic.toggle": "Вимкнути / увімкнути звук",
+      "s.phoneMic.muteNote": "Вимкнення звуку глушить мікрофон лише на цьому комп'ютері; поки мікрофон телефона ввімкнено, телефон продовжує запис. Вимкніть його, щоб зупинити запис.",
       "s.phoneMic.reconnects": "перепідключень: {n}, останнє за {ms} мс",
       "s.feeds.import": "+ Імпорт стрічок (OPML / списком)",
       "s.feeds.importTitle": "Імпорт стрічок RSS / Atom",

@@ -11,6 +11,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.phoneMic.setupFailed": "エージェントに接続できませんでした。",
       "s.phoneMic.startMuted": "ミュートで開始",
       "s.phoneMic.toggle": "ミュート / 解除",
+      "s.phoneMic.muteNote": "ミュートはこのパソコン上でマイクを無音にするだけです。スマホのマイクがオンの間、スマホは録音を続けます。録音を止めるにはオフにしてください。",
       "s.phoneMic.reconnects": "{n} 回再接続、直近は {ms} ms",
       "s.feeds.import": "+ フィードをインポート（OPML / 一括）",
       "s.feeds.importTitle": "RSS / Atom フィードのインポート",

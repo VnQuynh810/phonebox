@@ -17,8 +17,8 @@ public interface IPcmOutput : IDisposable
 /// The phone's microphone as a computer microphone, without scrcpy.exe: the agent pushes scrcpy-server 5.0.1 to the
 /// phone (only the official file, checked by SHA-256), starts it audio-only with raw PCM, reads it through an adb forward
 /// on 127.0.0.1 and plays it into a playback device picked by name, normally VB-Cable's "CABLE Input", so apps use
-/// "CABLE Output" as their mic. Reconnects by itself: when the phone is unplugged, and when Plugcam starts its camera
-/// (it stops every scrcpy server on the phone, this one included). Muting keeps the connection and plays silence.
+/// "CABLE Output" as their mic. Reconnects by itself: when the phone is unplugged, and when another tool that uses
+/// scrcpy stops every scrcpy server on the phone, this one included. Muting keeps the connection and plays silence.
 /// </summary>
 public sealed class PhoneMic : BackgroundService
 {
@@ -138,34 +138,84 @@ public sealed class PhoneMic : BackgroundService
         while (!ct.IsCancellationRequested)
         {
             var c = _cfg.Get().PhoneMic;
-            if (!c.Enabled) { SetState("off"); failures = 0; await Delay(1000, ct); continue; }
+            if (!c.Enabled)
+            {
+                // a later session after turning it back on is a first connection, not a reconnect
+                SetState("off"); failures = 0; Interlocked.Exchange(ref _lostAt, 0);
+                await Delay(1000, ct);
+                continue;
+            }
             if (AdbReverse.SessionEnding) { await Delay(2000, ct); continue; }
-            var adb = AdbReverse.FindAdb(_cfg.Get().AdbPath);
-            var serial = _adb?.DeviceList.FirstOrDefault();
+            string? adb, serial;
+            try
+            {
+                adb = AdbReverse.FindAdb(_cfg.Get().AdbPath);
+                serial = _adb?.DeviceList.FirstOrDefault();
+            }
+            catch (Exception ex)
+            {
+                SetState("error", ex.Message);
+                await Delay(5000, ct);
+                continue;
+            }
             if (adb is null || serial is null)
             {
                 SetState("waiting", adb is null ? "adb not found" : null);
                 await Delay(700, ct);
                 continue;
             }
-            var wasLive = false;
-            try { wasLive = await RunSession(adb, serial, c, ct); }
+            var liveMs = -1L;
+            try { liveMs = await RunSession(adb, serial, c, ct); }
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
+            catch (PhoneMicUnsupportedException ex)
+            {
+                // Android 10 and older, or a source the phone refuses: retrying soon only repeats the same answer
+                SetState("error", ex.Message + " Trying again in a minute or when another phone is plugged in.");
+                Buffer.Clear();
+                await WaitUnlessChanged(UnsupportedRetryMs, serial, c, ct);
+                continue;
+            }
             catch (Exception ex) { SetState("error", ex.Message); }
             Buffer.Clear();
             if (_state == "live") SetState("connecting");
             // recovery is timed from the first loss, across the failed attempts that may follow it
-            if (wasLive || Interlocked.Read(ref _lostAt) == 0) Interlocked.Exchange(ref _lostAt, Environment.TickCount64);
-            // a stream that ran retries at once (Plugcam's restart, a cable wiggle); one that never started backs off
-            failures = wasLive ? 0 : failures + 1;
+            if (liveMs >= 0 || Interlocked.Read(ref _lostAt) == 0) Interlocked.Exchange(ref _lostAt, Environment.TickCount64);
+            failures = NextFailures(failures, liveMs);
             if (failures >= 3) ForgetPhone(serial); // its copy of the server may be gone (phone reset, storage cleared)
-            // Plugcam stops every scrcpy server on the phone each time it (re)starts its camera, ours included, then waits
-            // 3 s (STALE_SERVER_GRACE in its scrcpy/server.rs) before starting its own: starting again at once lands in
-            // that pause, where nothing stops it a second time. Its reconnect after an unexpected loss can sweep once or
-            // twice more, so the first few retries stay quick too; only a server that keeps failing backs off.
-            await Delay(failures == 0 ? 50 : failures <= 6 ? 100 : Math.Min(5000, 100 << Math.Min(failures - 6, 6)), ct);
+            await Delay(RetryDelayMs(failures), ct);
         }
         try { await output; } catch (OperationCanceledException) { }
+    }
+
+    /// <summary>A stream must play this long before a loss counts as a fresh start (and retries at once again).</summary>
+    internal const long MinLiveMs = 2000;
+    internal const int UnsupportedRetryMs = 60_000;
+
+    /// <summary>
+    /// The failure count after a session that played for <paramref name="liveMs"/> (-1: never played). Only a stream
+    /// that ran for a while resets it: a server that sends its header and dies counts as a failure, so it backs off.
+    /// </summary>
+    internal static int NextFailures(int failures, long liveMs) => liveMs >= MinLiveMs ? 0 : failures + 1;
+
+    /// <summary>
+    /// Pause before the next try. Other tools that use scrcpy on the same phone (a phone-webcam app, for example) may
+    /// stop every scrcpy server on it when they start their own, ours included, and then wait a few seconds before
+    /// starting theirs: starting again at once lands in that pause, where nothing stops it a second time. Such a tool
+    /// can sweep once or twice more while it reconnects, so the first few retries stay quick too; a server that keeps
+    /// failing backs off to 5 s.
+    /// </summary>
+    internal static int RetryDelayMs(int failures) =>
+        failures == 0 ? 50 : failures <= 6 ? 100 : Math.Min(5000, 100 << Math.Min(failures - 6, 6));
+
+    /// <summary>Waits up to <paramref name="ms"/>, ending early when the mic is turned off, its settings change or the phone does.</summary>
+    private async Task WaitUnlessChanged(int ms, string serial, PhoneMicConfig c, CancellationToken ct)
+    {
+        for (var waited = 0; waited < ms && !ct.IsCancellationRequested; waited += 1000)
+        {
+            await Delay(1000, ct);
+            var now = _cfg.Get().PhoneMic;
+            if (!now.Enabled || now.Source != c.Source || _adb?.DeviceList.FirstOrDefault() != serial) return;
+        }
     }
 
     private static async Task Delay(int ms, CancellationToken ct)
@@ -183,37 +233,46 @@ public sealed class PhoneMic : BackgroundService
         {
             while (!ct.IsCancellationRequested)
             {
-                var c = _cfg.Get().PhoneMic;
-                Buffer.Configure(c.LatencyMs, c.MaxBufferMs, c.Gain);
-                var want = c.Enabled ? (c.Endpoint ?? "").Trim() : "";
-                if (output is not null && (output.Faulted || want != name || c.LatencyMs != latency))
+                // each pass on its own: a COM error from a device that was just removed must not end playback for good
+                try
                 {
-                    if (output.Faulted) _log.LogWarning("phone mic: playback on {Device} stopped; reopening", output.DeviceName);
-                    output.Dispose(); output = null; _outputDevice = null;
-                }
-                if (output is null && want.Length > 0)
-                {
-                    try
+                    var c = _cfg.Get().PhoneMic;
+                    Buffer.Configure(c.LatencyMs, c.MaxBufferMs, c.Gain);
+                    var want = c.Enabled ? (c.Endpoint ?? "").Trim() : "";
+                    if (output is not null && (output.Faulted || want != name || c.LatencyMs != latency))
+                    {
+                        if (output.Faulted) _log.LogWarning("phone mic: playback on {Device} stopped; reopening", output.DeviceName);
+                        var old = output;
+                        output = null; _outputDevice = null;
+                        old.Dispose();
+                    }
+                    if (output is null && want.Length > 0)
                     {
                         output = _outputFactory!(want, Math.Clamp(c.LatencyMs, 10, 500), Buffer);
                         name = want; latency = c.LatencyMs;
                         _outputDevice = output.DeviceName; _outputProblem = null;
                         _log.LogInformation("phone mic: playing into {Device}", output.DeviceName);
                     }
-                    catch (Exception ex)
-                    {
-                        if (_outputProblem != ex.Message) _log.LogWarning("phone mic: no output ({Message})", ex.Message);
-                        _outputProblem = ex.Message;
-                    }
+                }
+                catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+                {
+                    if (_outputProblem != ex.Message) _log.LogWarning("phone mic: no output ({Message})", ex.Message);
+                    _outputProblem = ex.Message;
+                    if (output is not null) { try { output.Dispose(); } catch { } output = null; }
+                    _outputDevice = null;
                 }
                 await Delay(output is null ? 3000 : 1000, ct);
             }
         }
-        finally { output?.Dispose(); _outputDevice = null; }
+        finally
+        {
+            try { output?.Dispose(); } catch { }
+            _outputDevice = null;
+        }
     }
 
-    /// <summary>One server run: push if needed, start, connect, stream until it ends. True if audio flowed.</summary>
-    private async Task<bool> RunSession(string adb, string serial, PhoneMicConfig c, CancellationToken ct)
+    /// <summary>One server run: push if needed, start, connect, stream until it ends. How long audio flowed (ms), or -1.</summary>
+    private async Task<long> RunSession(string adb, string serial, PhoneMicConfig c, CancellationToken ct)
     {
         var source = ScrcpyAudio.MicSources.Contains(c.Source) ? c.Source : "mic-camcorder";
         SetState("connecting", _problem);
@@ -232,7 +291,7 @@ public sealed class PhoneMic : BackgroundService
             var meta = new byte[ScrcpyAudio.MetaLength];
             await ReadExactly(stream, meta, ct);
             var (device, codec) = ScrcpyAudio.ParseMeta(meta);
-            if (ScrcpyAudio.CodecProblem(codec) is { } problem) throw new IOException(problem);
+            if (ScrcpyAudio.CodecProblem(codec) is { } problem) throw new PhoneMicUnsupportedException(problem);
 
             var lost = Interlocked.Exchange(ref _lostAt, 0);
             if (lost != 0) { LastRecoveryMs = Environment.TickCount64 - lost; Reconnects++; }
@@ -251,34 +310,34 @@ public sealed class PhoneMic : BackgroundService
                 await ReadExactly(stream, payload.AsMemory(0, h.Length), ct);
                 if (!h.Config) Buffer.Write(payload.AsSpan(0, h.Length));
             }
-            return true;
+            return LiveFor();
         }
         catch (IOException) when (_state == "live")
         {
-            _log.LogInformation("phone mic: the stream was cut (phone unplugged, or Plugcam restarted its camera)");
-            return true;
+            _log.LogInformation("phone mic: the stream was cut (phone unplugged, or another tool stopped the server)");
+            return LiveFor();
         }
         finally
         {
             if (server is not null)
             {
-                // Never kill a live "adb shell": on this computer that left the adb server hung (every adb command,
-                // Plugcam's too, then waits forever). The socket is closed by now, so the phone's server ends on its
-                // next write and the shell with it; one that never accepted is ended on the phone instead.
+                // The local "adb shell" is never killed: ending a live one is what left the adb server hung here (every
+                // adb command, other tools' too, then waits forever). The socket is closed by now, so the phone's server
+                // ends on its next write and the shell with it; one that never accepted is ended on the phone. A shell
+                // that still hasn't ended is left to finish by itself: only our handle to it is released.
                 if (!await Exited(server, 1500))
                 {
                     try { await AdbReverse.Adb(adb, $"-s {serial} shell pkill -f '[s]cid={scid:x8}'", CancellationToken.None, anyExit: true); } catch { }
                     if (!await Exited(server, 3000))
-                    {
-                        _log.LogWarning("phone mic: the adb shell did not end; stopping it");
-                        try { server.Kill(); } catch { }
-                    }
+                        _log.LogInformation("phone mic: the adb shell is still ending; leaving it to finish by itself");
                 }
                 server.Dispose();
             }
             try { await AdbReverse.Adb(adb, $"-s {serial} forward --remove tcp:{port}", CancellationToken.None, anyExit: true); } catch { }
         }
     }
+
+    private long LiveFor() => _state == "live" ? Environment.TickCount64 - Interlocked.Read(ref _liveSince) : -1;
 
     private static async Task<bool> Exited(Process p, int ms)
     {

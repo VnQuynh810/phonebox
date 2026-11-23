@@ -11,6 +11,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.phoneMic.setupFailed": "Agenta se nepodařilo zastihnout.",
       "s.phoneMic.startMuted": "Spouštět ztlumený",
       "s.phoneMic.toggle": "Ztlumit / zapnout zvuk",
+      "s.phoneMic.muteNote": "Ztlumení ztiší mikrofon jen na tomto počítači; dokud je mikrofon telefonu zapnutý, telefon dál nahrává. Vypněte jej, aby nahrávání skončilo.",
       "s.phoneMic.reconnects": "znovu připojeno {n}×, naposledy za {ms} ms",
       "s.feeds.import": "+ Importovat kanály (OPML / hromadně)",
       "s.feeds.importTitle": "Importovat kanály RSS / Atom",

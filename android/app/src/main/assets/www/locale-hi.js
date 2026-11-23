@@ -11,6 +11,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.phoneMic.setupFailed": "एजेंट से संपर्क नहीं हो सका।",
       "s.phoneMic.startMuted": "म्यूट करके शुरू करें",
       "s.phoneMic.toggle": "म्यूट / अनम्यूट",
+      "s.phoneMic.muteNote": "म्यूट सिर्फ़ इस कंप्यूटर पर माइक को चुप करता है; जब तक फ़ोन माइक चालू है, फ़ोन रिकॉर्ड करता रहता है। रिकॉर्डिंग रोकने के लिए इसे बंद करें।",
       "s.phoneMic.reconnects": "{n} बार फिर से जुड़ा, पिछली बार {ms} ms में",
       "s.feeds.import": "+ फ़ीड आयात करें (OPML / एक साथ)",
       "s.feeds.importTitle": "RSS / Atom फ़ीड आयात करें",

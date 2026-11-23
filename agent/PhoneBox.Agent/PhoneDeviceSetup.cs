@@ -16,6 +16,27 @@ public static class PhoneDeviceSetup
     public const string ServerFileName = "scrcpy-server-5.0.1";
     public const string CableUrl = "https://vb-audio.com/Cable/";
 
+    /// <summary>The official file is about 720 KB; a larger answer is not it, and is not read to the end.</summary>
+    public const int MaxServerBytes = 2 * 1024 * 1024;
+
+    /// <summary>Fetches <paramref name="url"/>, refusing an answer larger than <see cref="MaxServerBytes"/>.</summary>
+    public static async Task<byte[]> DownloadAsync(HttpClient http, string url, CancellationToken ct)
+    {
+        using var res = await http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+        res.EnsureSuccessStatusCode();
+        if (res.Content.Headers.ContentLength > MaxServerBytes) throw new InvalidDataException("the download is larger than scrcpy-server");
+        await using var body = await res.Content.ReadAsStreamAsync(ct);
+        using var kept = new MemoryStream();
+        var chunk = new byte[64 * 1024];
+        int n;
+        while ((n = await body.ReadAsync(chunk, ct)) > 0)
+        {
+            if (kept.Length + n > MaxServerBytes) throw new InvalidDataException("the download is larger than scrcpy-server");
+            kept.Write(chunk, 0, n);
+        }
+        return kept.ToArray();
+    }
+
     public sealed record Result(bool Ok, string Message, string? Version = null);
 
     /// <summary>Where the downloaded server is kept: next to the settings file, so updating the agent keeps it.</summary>

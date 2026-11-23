@@ -11,6 +11,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.phoneMic.setupFailed": "無法連線到代理程式。",
       "s.phoneMic.startMuted": "啟動時靜音",
       "s.phoneMic.toggle": "靜音 / 取消靜音",
+      "s.phoneMic.muteNote": "靜音只會讓這台電腦上的麥克風無聲;只要手機麥克風開著,手機仍在錄音。關閉它才能停止錄音。",
       "s.phoneMic.reconnects": "已重新連線 {n} 次,最近一次耗時 {ms} 毫秒",
       "s.feeds.import": "+ 匯入訂閱來源（OPML / 批次）",
       "s.feeds.importTitle": "匯入 RSS / Atom 訂閱來源",

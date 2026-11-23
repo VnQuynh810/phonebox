@@ -695,6 +695,7 @@ nav a.on::before { color: var(--accent); }
         <p class="hint" style="margin:0 0 12px" data-i18n="s.phoneMic.hint">The phone's mic plays into a virtual cable such as VB-CABLE; apps pick the cable's other end (CABLE Output) as their microphone. Set up checks for the cable, downloads scrcpy-server 5.0.1 from GitHub if it is missing, and turns the mic on. The phone must be on USB. More options: Advanced › JSON (phoneMic).</p>
         <div class="row" style="margin:4px 0 8px"><label class="switch"><input type="checkbox" data-bind="phoneMic.startMuted" aria-labelledby="phoneMicMutedLabel"><span></span></label> <span id="phoneMicMutedLabel" data-i18n="s.phoneMic.startMuted">Start muted</span></div>
         <div class="row"><button class="btn sm" id="phoneMicMute" data-i18n="s.phoneMic.toggle">Mute / unmute</button><span class="hint" id="phoneMicState"></span></div>
+        <p class="hint" style="margin:6px 0 0" data-i18n="s.phoneMic.muteNote">Mute only silences the mic on this computer; while the phone mic is on, the phone keeps recording. Turn it off to stop recording.</p>
       </div>
 
       <div class="card">

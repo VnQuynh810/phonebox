@@ -11,6 +11,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.phoneMic.setupFailed": "ติดต่อเอเจนต์ไม่ได้",
       "s.phoneMic.startMuted": "เริ่มแบบปิดเสียง",
       "s.phoneMic.toggle": "ปิด / เปิดเสียง",
+      "s.phoneMic.muteNote": "การปิดเสียงทำให้ไมค์เงียบเฉพาะบนคอมพิวเตอร์เครื่องนี้ ขณะที่ไมค์ของโทรศัพท์ยังเปิดอยู่ โทรศัพท์จะยังบันทึกเสียงต่อไป ปิดไมค์เพื่อหยุดบันทึก",
       "s.phoneMic.reconnects": "เชื่อมต่อใหม่ {n} ครั้ง ล่าสุดใช้ {ms} ms",
       "s.feeds.import": "+ นำเข้าฟีด (OPML / ทีละหลายรายการ)",
       "s.feeds.importTitle": "นำเข้าฟีด RSS / Atom",

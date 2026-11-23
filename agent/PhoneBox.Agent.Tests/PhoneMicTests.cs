@@ -171,6 +171,32 @@ public sealed class PhoneMicTests
         Assert.Equal(30 * ScrcpyAudio.BytesPerMs, buf.MaxBytes);
     }
 
+    [Fact]
+    public void TheRingAlwaysHoldsTheTarget()
+    {
+        // a capacity smaller than the target used to leave playback waiting for ever, playing silence
+        var buf = new PcmJitterBuffer(targetMs: 150, maxMs: 200, capacityMs: 100);
+        buf.Write(Enumerable.Repeat((byte)1, 160 * ScrcpyAudio.BytesPerMs).ToArray());
+        var played = new byte[10 * ScrcpyAudio.BytesPerMs];
+        buf.Read(played);
+        Assert.All(played, b => Assert.Equal(1, b));
+    }
+
+    [Fact]
+    public void OnlyAStreamThatRanForAWhileStartsTheRetriesAfresh()
+    {
+        Assert.Equal(0, PhoneMic.NextFailures(5, PhoneMic.MinLiveMs));       // played long enough: a fresh loss
+        Assert.Equal(6, PhoneMic.NextFailures(5, 300));                      // header then death: still failing
+        Assert.Equal(1, PhoneMic.NextFailures(0, -1));                       // never played
+        Assert.Equal(50, PhoneMic.RetryDelayMs(0));
+        Assert.Equal(100, PhoneMic.RetryDelayMs(6));
+        Assert.Equal(5000, PhoneMic.RetryDelayMs(40));
+        // a server that keeps sending its header and dying backs off instead of restarting every 50 ms
+        var failures = 0;
+        for (var i = 0; i < 20; i++) failures = PhoneMic.NextFailures(failures, 100);
+        Assert.Equal(5000, PhoneMic.RetryDelayMs(failures));
+    }
+
     private sealed class Temp : IDisposable
     {
         public readonly string Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"phonebox-mic-{Guid.NewGuid():N}.json");

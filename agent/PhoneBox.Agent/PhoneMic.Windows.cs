@@ -25,11 +25,16 @@ internal sealed class WasapiPcmOutput : IPcmOutput, IWaveProvider
         _buffer = buffer;
         using var devices = new MMDeviceEnumerator();
         var all = devices.EnumerateAudioEndPoints(DataFlow.Render, DeviceState.Active).ToList();
-        _device = all.FirstOrDefault(d => d.FriendlyName.Contains(name, StringComparison.OrdinalIgnoreCase))
-            ?? throw new IOException($"no active playback device named like \"{name}\"");
-        foreach (var d in all.Where(d => d != _device)) d.Dispose();
-        DeviceName = _device.FriendlyName;
-        _out = new WasapiOut(_device, AudioClientShareMode.Shared, true, latencyMs);
+        var match = all.FirstOrDefault(d => d.FriendlyName.Contains(name, StringComparison.OrdinalIgnoreCase));
+        // every handle but the one kept is released, also when none matched (this is retried every few seconds)
+        foreach (var d in all.Where(d => d != match)) d.Dispose();
+        _device = match ?? throw new IOException($"no active playback device named like \"{name}\"");
+        try
+        {
+            DeviceName = _device.FriendlyName;
+            _out = new WasapiOut(_device, AudioClientShareMode.Shared, true, latencyMs);
+        }
+        catch { _device.Dispose(); throw; }
         _out.PlaybackStopped += (_, _) => _faulted = true;
         try { _out.Init(this); _out.Play(); }
         catch { _out.Dispose(); _device.Dispose(); throw; }
@@ -53,9 +58,10 @@ internal sealed class WasapiPcmOutput : IPcmOutput, IWaveProvider
     public void Dispose()
     {
         _faulted = true;
+        // a device that was just removed can throw from any of these; each one is still tried
         try { _out.Stop(); } catch { }
-        _out.Dispose();
-        _device.Dispose();
+        try { _out.Dispose(); } catch { }
+        try { _device.Dispose(); } catch { }
     }
 }
 #endif

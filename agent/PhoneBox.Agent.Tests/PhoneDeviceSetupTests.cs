@@ -1,3 +1,4 @@
+using System.Net;
 using System.Security.Cryptography;
 using PhoneBox.Agent;
 using Xunit;
@@ -75,5 +76,39 @@ public class PhoneDeviceSetupTests : IDisposable
         Assert.Equal("CABLE Input", c.PhoneMic.Endpoint);
         Assert.Equal(500, c.PhoneMic.LatencyMs);
         Assert.Equal(8, c.PhoneMic.Gain);
+    }
+
+    private sealed class Answer(HttpContent content) : HttpMessageHandler
+    {
+        public bool Called { get; private set; }
+        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken ct)
+        {
+            Called = true;
+            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
+        }
+    }
+
+    /// <summary>A body with no length header, so only the read loop can stop it.</summary>
+    private sealed class Endless(long size) : HttpContent
+    {
+        protected override async Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+        {
+            var chunk = new byte[64 * 1024];
+            for (long sent = 0; sent < size; sent += chunk.Length) await stream.WriteAsync(chunk);
+        }
+        protected override bool TryComputeLength(out long length) { length = 0; return false; }
+    }
+
+    [Fact]
+    public async Task TheDownloadIsCappedAtTwoMegabytes()
+    {
+        using var small = new HttpClient(new Answer(new ByteArrayContent(Server)));
+        Assert.Equal(Server, await PhoneDeviceSetup.DownloadAsync(small, PhoneDeviceSetup.ServerUrl, CancellationToken.None));
+
+        using var declared = new HttpClient(new Answer(new ByteArrayContent(new byte[PhoneDeviceSetup.MaxServerBytes + 1])));
+        await Assert.ThrowsAsync<InvalidDataException>(() => PhoneDeviceSetup.DownloadAsync(declared, PhoneDeviceSetup.ServerUrl, CancellationToken.None));
+
+        using var unbounded = new HttpClient(new Answer(new Endless(10L * 1024 * 1024)));
+        await Assert.ThrowsAsync<InvalidDataException>(() => PhoneDeviceSetup.DownloadAsync(unbounded, PhoneDeviceSetup.ServerUrl, CancellationToken.None));
     }
 }

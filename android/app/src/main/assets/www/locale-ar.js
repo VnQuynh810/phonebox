@@ -11,6 +11,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.phoneMic.setupFailed": "تعذّر الوصول إلى الوكيل.",
       "s.phoneMic.startMuted": "البدء مكتوم الصوت",
       "s.phoneMic.toggle": "كتم / إلغاء الكتم",
+      "s.phoneMic.muteNote": "الكتم يُسكت الميكروفون على هذا الحاسوب فقط؛ ما دام ميكروفون الهاتف مفعّلًا يواصل الهاتف التسجيل. أوقفه لإيقاف التسجيل.",
       "s.phoneMic.reconnects": "أُعيد الاتصال {n} مرة، آخرها خلال {ms} مللي ثانية",
       "s.feeds.import": "+ استيراد الخلاصات (OPML / دفعة واحدة)",
       "s.feeds.importTitle": "استيراد خلاصات RSS / Atom",

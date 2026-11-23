@@ -11,6 +11,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.phoneMic.setupFailed": "에이전트에 연결할 수 없습니다.",
       "s.phoneMic.startMuted": "음소거로 시작",
       "s.phoneMic.toggle": "음소거 / 해제",
+      "s.phoneMic.muteNote": "음소거는 이 컴퓨터에서만 마이크 소리를 끕니다. 휴대폰 마이크가 켜져 있는 동안 휴대폰은 계속 녹음합니다. 녹음을 멈추려면 끄세요.",
       "s.phoneMic.reconnects": "{n}번 다시 연결됨, 최근 {ms} ms",
       "s.feeds.import": "+ 피드 가져오기 (OPML / 일괄)",
       "s.feeds.importTitle": "RSS / Atom 피드 가져오기",

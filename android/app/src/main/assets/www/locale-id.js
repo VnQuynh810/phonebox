@@ -11,6 +11,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "s.phoneMic.setupFailed": "Agen tidak dapat dihubungi.",
       "s.phoneMic.startMuted": "Mulai dalam keadaan bisu",
       "s.phoneMic.toggle": "Bisukan / bunyikan",
+      "s.phoneMic.muteNote": "Membisukan hanya membungkam mikrofon di komputer ini; selama mikrofon ponsel menyala, ponsel tetap merekam. Matikan untuk berhenti merekam.",
       "s.phoneMic.reconnects": "tersambung ulang {n}×, terakhir dalam {ms} ms",
       "s.feeds.import": "+ Impor feed (OPML / sekaligus)",
       "s.feeds.importTitle": "Impor feed RSS / Atom",

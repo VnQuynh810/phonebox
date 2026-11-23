@@ -540,7 +540,7 @@ app.MapPost("/api/phone-mic/setup", async (ConfigStore cfg, CancellationToken ct
 {
     if (!OperatingSystem.IsWindows()) return Results.Json(new PhoneDeviceSetup.Result(false, "The phone mic needs Windows."));
     using var http = new HttpClient { Timeout = TimeSpan.FromMinutes(1) };
-    var r = await PhoneDeviceSetup.SetupMicAsync(cfg, PhoneDeviceSetup.PlaybackDevices, (url, t) => http.GetByteArrayAsync(url, t), ct);
+    var r = await PhoneDeviceSetup.SetupMicAsync(cfg, PhoneDeviceSetup.PlaybackDevices, (url, t) => PhoneDeviceSetup.DownloadAsync(http, url, t), ct);
     return Results.Json(r);
 });
 app.MapPost("/api/phone/open", async (AdbReverse adb) => { await adb.OpenPanelAsync(); return Results.Ok(); });

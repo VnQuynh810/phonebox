@@ -22,7 +22,7 @@ public static class ScrcpyAudio
     public const string Version = "5.0.1";
     /// <summary>SHA-256 of the official scrcpy-server 5.0.1 (the file in scrcpy-win64-v5.0.1); no other file is pushed.</summary>
     public const string ServerSha256 = "764eb6f79811d5211fe9df341120882ba9994c7a61b897d7bf3fb662e53bc536";
-    /// <summary>Where the agent keeps its copy on the phone, apart from scrcpy's and Plugcam's own.</summary>
+    /// <summary>Where the agent keeps its copy on the phone, apart from the copies scrcpy and other tools push.</summary>
     public const string RemotePath = "/data/local/tmp/phonebox-mic.jar";
     public const uint CodecRaw = 0x00_72_61_77;
     public const int DeviceNameLength = 64;
@@ -84,6 +84,9 @@ public static class ScrcpyAudio
     }
 }
 
+/// <summary>The phone answered but can't capture audio (Android 10 and older, or a source it refuses): retrying soon won't help.</summary>
+public sealed class PhoneMicUnsupportedException(string message) : Exception(message);
+
 /// <summary>
 /// Between the phone and the sound card: two clocks that never quite agree. The phone writes PCM as it arrives and the
 /// audio device reads at its own pace. Latency is kept from creeping up over hours: when more than
@@ -101,7 +104,8 @@ public sealed class PcmJitterBuffer
 
     public PcmJitterBuffer(int targetMs = 50, int maxMs = 150, int capacityMs = 1000)
     {
-        _ring = new byte[Align(Math.Max(capacityMs, 100) * ScrcpyAudio.BytesPerMs)];
+        // at least the largest ceiling Configure allows (900 ms) plus room, so any target can always be reached
+        _ring = new byte[Align(Math.Max(capacityMs, 1000) * ScrcpyAudio.BytesPerMs)];
         Configure(targetMs, maxMs, 1);
     }
 

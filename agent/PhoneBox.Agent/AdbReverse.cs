@@ -29,9 +29,6 @@ public sealed class AdbReverse(ConfigStore cfg, ILogger<AdbReverse> log, AgentEn
     // asked again now and then even when known: an app whose data was cleared has a new key and no pin, and can't say so
     internal const long KeyRefreshMs = 120_000;
 
-    /// <summary>Ends an adb server that stopped answering (see <see cref="AdbHangGuard"/>).</summary>
-    internal AdbHangGuard HangGuard { get; } = new(log);
-
     private string _lastState = "";
     private volatile string[] _devices = [];
     private volatile string[] _all = [];
@@ -125,11 +122,7 @@ public sealed class AdbReverse(ConfigStore cfg, ILogger<AdbReverse> log, AgentEn
         }
 
         var serial = cfg.Get().DeviceSerial;
-        string attached;
-        try { attached = await Adb(adb, "devices", ct); }
-        catch (TimeoutException) { await HangGuard.ReportAsync(true, ct); throw; }
-        await HangGuard.ReportAsync(false, ct);
-        var devices = attached
+        var devices = (await Adb(adb, "devices", ct))
             .Split('\n').Skip(1)
             .Select(l => l.Trim().Split('\t'))
             .Where(p => p.Length == 2 && p[1] == "device")
