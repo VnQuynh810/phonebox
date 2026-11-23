@@ -260,6 +260,9 @@ public static class Shortcuts
                     if (WakeOnLan.Wake(sc.Args) is { } wakeError) throw new InvalidOperationException(wakeError);
                     break;
                 case PhoneDevices.MicCmd:
+                case PhoneDevices.PlugcamStartCmd:
+                case PhoneDevices.PlugcamRestartCmd:
+                case PhoneDevices.PlugcamStopCmd:
                     PhoneDevices.Run(sc.Cmd, sc.Args);
                     break;
 #if WINDOWS

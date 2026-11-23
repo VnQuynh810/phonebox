@@ -695,6 +695,15 @@ nav a.on::before { color: var(--accent); }
         <p class="hint" style="margin:0 0 12px" data-i18n="s.phoneMic.hint">The phone's mic plays into a virtual cable such as VB-CABLE; apps pick the cable's other end (CABLE Output) as their microphone. Set up checks for the cable, downloads scrcpy-server 5.0.1 from GitHub if it is missing, and turns the mic on. The phone must be on USB. More options: Advanced › JSON (phoneMic).</p>
         <div class="row" style="margin:4px 0 8px"><label class="switch"><input type="checkbox" data-bind="phoneMic.startMuted" aria-labelledby="phoneMicMutedLabel"><span></span></label> <span id="phoneMicMutedLabel" data-i18n="s.phoneMic.startMuted">Start muted</span></div>
         <div class="row"><button class="btn sm" id="phoneMicMute" data-i18n="s.phoneMic.toggle">Mute / unmute</button><span class="hint" id="phoneMicState"></span></div>
+
+        <h3 style="margin-top:18px" data-i18n="s.plugcam.title">Plugcam (phone as webcam)</h3>
+        <div class="row" style="margin-bottom:8px"><label class="switch"><input type="checkbox" data-bind="plugcam.manage" aria-labelledby="plugcamManageLabel"><span></span></label> <span id="plugcamManageLabel" data-i18n="s.plugcam.manage">Start Plugcam with the agent and restart it if it crashes</span></div>
+        <div class="row" style="margin-bottom:8px"><button class="btn sm" id="plugcamSetup" data-setup="/api/plugcam/setup" data-i18n="s.plugcam.setup">Set up</button><span class="hint" id="plugcamSetupState" aria-live="polite"></span></div>
+        <p class="hint" style="margin:0 0 12px" data-i18n="s.plugcam.hint">Set up finds plugcam.exe and lets the agent start it. A Plugcam that is already running is watched, not started twice; turn off Launch at login in Plugcam. Closing it from its tray keeps it closed until it is started from the phone.</p>
+        <div class="grid2">
+          <div class="field"><label for="plugcamPath" data-i18n="s.plugcam.path">plugcam.exe</label><input id="plugcamPath" type="text" data-bind="plugcam.path" spellcheck="false"></div>
+        </div>
+        <div class="row"><span class="hint" id="plugcamState"></span></div>
       </div>
 
       <div class="card">
@@ -1182,6 +1191,9 @@ const PRESETS = [
   ['builtin:lock', 'Built-in: lock the PC'],
   ['builtin:wake', 'Built-in: wake a computer (Wake-on-LAN; args: MAC)'],
   ['builtin:phone-mic', 'Built-in: phone mic on / off (args: mute or unmute to set it)'],
+  ['builtin:plugcam-start', 'Built-in: start Plugcam'],
+  ['builtin:plugcam-restart', 'Built-in: restart Plugcam'],
+  ['builtin:plugcam-stop', 'Built-in: stop Plugcam (stays closed until started again)'],
 ];
 
 let cfg = null;        // settings being edited
@@ -2381,23 +2393,24 @@ $('haTest').onclick = async () => {
     $('haState').textContent = r.result;
   } catch (_) { $('haState').textContent = 'Could not check'; }
 };
-// Phone mic: live state under the settings (Windows only; the agent leaves it off elsewhere).
+// Phone mic and Plugcam: live state under the settings (Windows only; the agent leaves both off elsewhere).
 async function renderPhoneMicState() {
   if (document.hidden || !$('phoneMicState')) return;
   try {
     const r = await (await fetch('/api/phone-mic', { cache: 'no-store' })).json();
-    const m = r.mic;
+    const m = r.mic, p = r.plugcam;
     const parts = [m.output && m.state === 'live' ? m.text + ' → ' + m.output : m.text];
     if (m.problem) parts.push(m.problem);
     if (m.outputProblem && m.enabled) parts.push(m.outputProblem);
     if (m.reconnects) parts.push(t('s.phoneMic.reconnects', { n: m.reconnects, ms: m.lastRecoveryMs }));
     $('phoneMicState').textContent = parts.join(' · ');
     $('phoneMicMute').disabled = !m.enabled;
-  } catch (_) { $('phoneMicState').textContent = ''; }
+    $('plugcamState').textContent = [p.text, p.problem].filter(Boolean).join(' · ');
+  } catch (_) { $('phoneMicState').textContent = ''; $('plugcamState').textContent = ''; }
 }
-// Set up (the only thing that turns the mic on besides its switch): runs on the agent, which saves the settings
+// Set up (the only thing that turns either one on besides its switch): runs on the agent, which saves the settings
 // itself, so the page reloads them afterwards; unsaved edits would be lost, so it asks for a save first.
-for (const id of ['phoneMicSetup']) {
+for (const id of ['phoneMicSetup', 'plugcamSetup']) {
   $(id).onclick = async () => {
     const b = $(id), out = $(id + 'State');
     if (JSON.stringify(cfg) !== saved) { out.textContent = t('s.phoneMic.saveFirst'); return; }
@@ -2716,7 +2729,7 @@ const RULE_PRESETS = [
 let activeRules = [];
 
 function renderRules() {
-  cfg.rules ??= []; cfg.calendars ??= []; cfg.feeds ??= []; cfg.cameras ??= { ffmpeg: '', sources: [] }; cfg.photos ??= { source: 'folder', folder: '', subfolders: true, immichUrl: '', immichKey: '', immichAlbum: '', immichAlbumName: '' }; cfg.console ??= { profiles: [] }; cfg.phones ??= []; cfg.homeAssistant ??= {}; cfg.obs ??= { enabled: false, url: 'ws://127.0.0.1:4455' }; cfg.phoneMic ??= { enabled: false, source: 'mic-camcorder', endpoint: 'CABLE Input', latencyMs: 50, maxBufferMs: 150, gain: 1, serverPath: null, startMuted: false }; cfg.discord ??= { enabled: false }; cfg.steam ??= { enabled: false };
+  cfg.rules ??= []; cfg.calendars ??= []; cfg.feeds ??= []; cfg.cameras ??= { ffmpeg: '', sources: [] }; cfg.photos ??= { source: 'folder', folder: '', subfolders: true, immichUrl: '', immichKey: '', immichAlbum: '', immichAlbumName: '' }; cfg.console ??= { profiles: [] }; cfg.phones ??= []; cfg.homeAssistant ??= {}; cfg.obs ??= { enabled: false, url: 'ws://127.0.0.1:4455' }; cfg.phoneMic ??= { enabled: false, source: 'mic-camcorder', endpoint: 'CABLE Input', latencyMs: 50, maxBufferMs: 150, gain: 1, serverPath: null, startMuted: false }; cfg.plugcam ??= { manage: false, path: null, args: '--minimized' }; cfg.discord ??= { enabled: false }; cfg.steam ??= { enabled: false };
   $('rulePresets').replaceChildren(...RULE_PRESETS.map(([label, make]) => h('button', { class: 'btn', onclick: () => {
     cfg.rules.push({ id: '', enabled: true, ...make() });
     renderRules(); changed();

@@ -52,6 +52,8 @@ public sealed class AgentConfig
     public SteamConfig Steam { get; set; } = new();
     /// <summary>The phone's microphone, played into a virtual audio cable (Windows; off by default).</summary>
     public PhoneMicConfig PhoneMic { get; set; } = new();
+    /// <summary>Plugcam (the phone as a webcam): started, watched and restarted by the agent (Windows; off by default).</summary>
+    public PlugcamConfig Plugcam { get; set; } = new();
 
     /// <summary>The pages a phone shows: its own selection (Settings › Phones), or all of them.</summary>
     public IEnumerable<PageConfig> PagesFor(string? deviceId)
@@ -425,6 +427,14 @@ public sealed class PhoneMicConfig
     public bool StartMuted { get; set; }
 }
 
+/// <summary>Plugcam as a child of the agent: started when it is not running, restarted when it ends abnormally.</summary>
+public sealed class PlugcamConfig
+{
+    public bool Manage { get; set; }
+    public string? Path { get; set; }
+    public string Args { get; set; } = "--minimized";
+}
+
 public sealed class ObsConfig
 {
     public bool Enabled { get; set; }
@@ -500,7 +510,7 @@ public sealed class Shortcut
     public string Icon { get; set; } = "";
     public string Color { get; set; } = "#6b7280";
     /// <summary>A program, address or file; or builtin:lock / monitor-off / mute / keys / text / macro, or the phone
-    /// mic command (builtin:phone-mic, see PhoneDevices).</summary>
+    /// mic and Plugcam commands (builtin:phone-mic / plugcam-start / plugcam-restart / plugcam-stop, see PhoneDevices).</summary>
     public string Cmd { get; set; } = "";
     /// <summary>Program arguments; the key combination for builtin:keys ("ctrl+shift+m"); the text for builtin:text.</summary>
     public string? Args { get; set; }
@@ -788,6 +798,9 @@ public sealed partial class ConfigStore(string path)
         mic.MaxBufferMs = Math.Clamp(mic.MaxBufferMs, mic.LatencyMs + 20, 900);
         mic.Gain = double.IsFinite(mic.Gain) ? Math.Clamp(mic.Gain, 0, 8) : 1;
         mic.ServerPath = string.IsNullOrWhiteSpace(mic.ServerPath) ? null : mic.ServerPath.Trim();
+        c.Plugcam ??= new();
+        c.Plugcam.Path = string.IsNullOrWhiteSpace(c.Plugcam.Path) ? null : c.Plugcam.Path.Trim();
+        c.Plugcam.Args = (c.Plugcam.Args ?? "").Trim();
         c.Discord ??= new();
         c.Discord.ClientId = string.IsNullOrWhiteSpace(c.Discord.ClientId) ? null : c.Discord.ClientId.Trim();
         c.Discord.ClientSecret = string.IsNullOrWhiteSpace(c.Discord.ClientSecret) ? null : c.Discord.ClientSecret.Trim();

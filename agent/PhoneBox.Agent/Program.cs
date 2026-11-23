@@ -103,14 +103,16 @@ builder.Services.AddSingleton(sp => new LyricsService(sp.GetRequiredService<Conf
 AddMonitor<BatteryMonitor>(builder.Services);
 AddMonitor<RuleEngine>(builder.Services);
 AddMonitor<ChargeGuard>(builder.Services);
-// the phone's microphone into a virtual cable (off by default)
+// the phone's microphone into a virtual cable, and Plugcam (the phone as a webcam) kept running (both off by default)
 AddMonitor<PhoneMic>(builder.Services);
+AddMonitor<Plugcam>(builder.Services);
 builder.Services.AddHostedService<Tray>();
 
 var app = builder.Build();
 {
-    // the phone acts on it through a shortcut command and reads it in /api/state (see PhoneDevices)
+    // the phone acts on them through shortcut commands and reads them in /api/state (see PhoneDevices)
     PhoneDevices.Mic = app.Services.GetRequiredService<PhoneMic>();
+    PhoneDevices.Plugcam = app.Services.GetRequiredService<Plugcam>();
 }
 
 app.MapGet("/api/controls/state", async (ControlDeck deck, CancellationToken ct) => Results.Json(await deck.Snapshot(ct)));
@@ -528,14 +530,14 @@ app.MapGet("/api/info", (AdbReverse adb, ConfigStore cfg) => Results.Json(new
     webviewProblem = WebViewDoctor.DiagnoseRecent(PhoneRegistry.All(), DateTimeOffset.UtcNow.ToUnixTimeMilliseconds()),
 }));
 
-// Phone mic status for the settings page and scripts (local port only: not a phone path, see Lan.AllowedOverLan).
-app.MapGet("/api/phone-mic", (PhoneMic mic) => Results.Json(new { mic = mic.Snapshot() }));
+// Phone mic and Plugcam status for the settings page and scripts (local port only: not a phone path, see Lan.AllowedOverLan).
+app.MapGet("/api/phone-mic", (PhoneMic mic, Plugcam cam) => Results.Json(new { mic = mic.Snapshot(), plugcam = cam.Snapshot() }));
 app.MapPost("/api/phone-mic/mute", (bool? muted, PhoneMic mic) =>
 {
     if (muted is null) mic.Toggle(); else mic.SetMuted(muted.Value);
     return Results.Json(new { muted = mic.Muted });
 });
-// Set up: the only way the mic starts (the user presses it in the settings page; local port only).
+// Set up: the only way either one starts (the user presses it in the settings page; local port only).
 app.MapPost("/api/phone-mic/setup", async (ConfigStore cfg, CancellationToken ct) =>
 {
     if (!OperatingSystem.IsWindows()) return Results.Json(new PhoneDeviceSetup.Result(false, "The phone mic needs Windows."));
@@ -543,6 +545,9 @@ app.MapPost("/api/phone-mic/setup", async (ConfigStore cfg, CancellationToken ct
     var r = await PhoneDeviceSetup.SetupMicAsync(cfg, PhoneDeviceSetup.PlaybackDevices, (url, t) => http.GetByteArrayAsync(url, t), ct);
     return Results.Json(r);
 });
+app.MapPost("/api/plugcam/setup", (ConfigStore cfg) => Results.Json(OperatingSystem.IsWindows()
+    ? PhoneDeviceSetup.SetupPlugcam(cfg, PhoneDeviceSetup.RunningPlugcam, File.Exists)
+    : new PhoneDeviceSetup.Result(false, "Plugcam needs Windows.")));
 app.MapPost("/api/phone/open", async (AdbReverse adb) => { await adb.OpenPanelAsync(); return Results.Ok(); });
 
 // Widget types and page templates for the settings page's layout editor.
@@ -613,6 +618,7 @@ object State(IServiceProvider sp, long? ev)
         toggles = Shortcuts.States(sp.GetRequiredService<ConfigStore>().Get(), push, sp.GetRequiredService<AudioControl>()),
         cycles = Shortcuts.CycleStates(sp.GetRequiredService<ConfigStore>().Get()),
         phoneMic = sp.GetRequiredService<PhoneMic>().PhoneState(),
+        plugcam = sp.GetRequiredService<Plugcam>().PhoneState(),
     };
 }
 

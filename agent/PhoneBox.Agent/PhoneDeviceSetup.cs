@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
@@ -5,10 +6,11 @@ using System.Text.Json;
 namespace PhoneBox.Agent;
 
 /// <summary>
-/// The phone mic stays off until the user presses its Set up button in the settings page; nothing here runs on its
-/// own. Set up checks that a playback device to play into exists (a virtual cable cannot be
+/// The phone mic and Plugcam stay off until the user presses their Set up button in the settings page; nothing here
+/// runs on its own. Setting up the mic checks that a playback device to play into exists (a virtual cable cannot be
 /// installed for the user: it is a driver), fetches the official scrcpy-server 5.0.1 from the scrcpy release on
-/// GitHub when no copy is found (checked against its SHA-256 before it is kept), and turns the mic on.
+/// GitHub when no copy is found (checked against its SHA-256 before it is kept), and turns the mic on. Setting up
+/// Plugcam finds plugcam.exe and only then lets the agent start and watch it.
 /// </summary>
 public static class PhoneDeviceSetup
 {
@@ -59,6 +61,29 @@ public static class PhoneDeviceSetup
             "Phone mic is on. Plug the phone in over USB; apps pick the cable's other end (for VB-CABLE: CABLE Output) as their microphone.");
     }
 
+    /// <summary>Finds plugcam.exe (the configured path, a running copy, then the usual install folders) and lets the agent manage it.</summary>
+    public static Result SetupPlugcam(ConfigStore cfg, Func<IEnumerable<string>> runningPaths, Func<string, bool> exists)
+    {
+        var configured = cfg.Get().Plugcam.Path;
+        var found = new[] { configured }.Concat(runningPaths()).Concat(InstallCandidates())
+            .FirstOrDefault(p => !string.IsNullOrWhiteSpace(p) && exists(p!));
+        if (found is null)
+            return new(false, "plugcam.exe was not found. Start Plugcam once, or type the path to plugcam.exe, then press Set up again.");
+        return Save(cfg, x => { x.Plugcam.Manage = true; x.Plugcam.Path = found; },
+            $"The agent now starts Plugcam ({found}) and restarts it if it crashes. Turn off Launch at login in Plugcam so it is not started twice.");
+    }
+
+    internal static IEnumerable<string> InstallCandidates()
+    {
+        foreach (var root in new[] { Environment.SpecialFolder.LocalApplicationData, Environment.SpecialFolder.ProgramFiles, Environment.SpecialFolder.ProgramFilesX86 })
+        {
+            var dir = Environment.GetFolderPath(root);
+            if (string.IsNullOrEmpty(dir)) continue;
+            yield return Path.Combine(dir, "Programs", "Plugcam", "plugcam.exe");
+            yield return Path.Combine(dir, "Plugcam", "plugcam.exe");
+        }
+    }
+
     /// <summary>The names of the active playback devices.</summary>
     public static IReadOnlyList<string> PlaybackDevices() =>
 #if WINDOWS
@@ -66,6 +91,18 @@ public static class PhoneDeviceSetup
 #else
         [];
 #endif
+
+    /// <summary>The full paths of running plugcam.exe processes (ones this user can read).</summary>
+    public static IEnumerable<string> RunningPlugcam()
+    {
+        foreach (var p in Process.GetProcessesByName("plugcam"))
+        {
+            string? path = null;
+            try { path = p.MainModule?.FileName; } catch { }
+            p.Dispose();
+            if (path is not null) yield return path;
+        }
+    }
 
     private static string Sha256Of(string path)
     {

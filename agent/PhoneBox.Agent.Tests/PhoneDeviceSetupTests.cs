@@ -66,14 +66,31 @@ public class PhoneDeviceSetupTests : IDisposable
     }
 
     [Fact]
-    public void TheMicIsOffInAFreshConfigAndBadValuesAreRepaired()
+    public void PlugcamIsManagedOnlyOnceItIsFound()
     {
-        File.WriteAllText(_config, """{ "phoneMic": { "source": "rm -rf", "endpoint": " ", "latencyMs": 99999, "gain": 50 } }""");
+        var store = new ConfigStore(_config);
+        var missing = PhoneDeviceSetup.SetupPlugcam(store, () => [], _ => false);
+        Assert.False(missing.Ok);
+        Assert.False(store.Get().Plugcam.Manage);
+
+        var exe = Path.Combine(_dir, "plugcam.exe");
+        var found = PhoneDeviceSetup.SetupPlugcam(store, () => [exe], p => p == exe);
+        Assert.True(found.Ok, found.Message);
+        Assert.True(store.Get().Plugcam.Manage);
+        Assert.Equal(exe, store.Get().Plugcam.Path);
+    }
+
+    [Fact]
+    public void BothAreOffInAFreshConfigAndBadValuesAreRepaired()
+    {
+        File.WriteAllText(_config, """{ "phoneMic": { "source": "rm -rf", "endpoint": " ", "latencyMs": 99999, "gain": 50 }, "plugcam": { "args": null } }""");
         var c = new ConfigStore(_config).Get();
         Assert.False(c.PhoneMic.Enabled);
+        Assert.False(c.Plugcam.Manage);
         Assert.Equal("mic-camcorder", c.PhoneMic.Source);
         Assert.Equal("CABLE Input", c.PhoneMic.Endpoint);
         Assert.Equal(500, c.PhoneMic.LatencyMs);
         Assert.Equal(8, c.PhoneMic.Gain);
+        Assert.Equal("", c.Plugcam.Args);
     }
 }

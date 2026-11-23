@@ -35,6 +35,8 @@
   // so apps pick the cable's other end as their microphone. Settings › General › Phone mic › Set up turns it on and fetches
   // scrcpy-server 5.0.1 from GitHub if it is missing ("serverPath": null = the copy next to this file)
   "phoneMic": { "enabled": false, "source": "mic-camcorder", "endpoint": "CABLE Input", "latencyMs": 50, "maxBufferMs": 150, "gain": 1, "serverPath": null, "startMuted": false },
+  // Plugcam, the phone as a webcam (Windows, off by default): "manage" lets the agent start it and restart it after a crash
+  "plugcam": { "manage": false, "path": null, "args": "--minimized" },
   // Steam friends widget: enter your SteamID64 and a user Web API key in Settings › General (see docs/STEAM.md)
   "steam": { "enabled": false, "steamId": null, "apiKey": null },
 

@@ -264,15 +264,90 @@ public sealed class PhoneMicTests
     [Fact]
     public void CommandsForWhatIsOffSayWhy()
     {
-        var mic = PhoneDevices.Mic;
-        PhoneDevices.Mic = null;
+        var (mic, cam) = (PhoneDevices.Mic, PhoneDevices.Plugcam);
+        PhoneDevices.Mic = null; PhoneDevices.Plugcam = null;
         try
         {
             Assert.Throws<InvalidOperationException>(() => PhoneDevices.Run(PhoneDevices.MicCmd, null));
+            Assert.Throws<InvalidOperationException>(() => PhoneDevices.Run(PhoneDevices.PlugcamRestartCmd, null));
             Assert.Null(PhoneDevices.MicOn);
-            Assert.True(PhoneDevices.IsCommand("builtin:phone-mic"));
+            Assert.True(PhoneDevices.IsCommand("builtin:plugcam-start"));
             Assert.False(PhoneDevices.IsCommand("builtin:mute"));
         }
-        finally { PhoneDevices.Mic = mic; }
+        finally { (PhoneDevices.Mic, PhoneDevices.Plugcam) = (mic, cam); }
+    }
+
+    [Fact]
+    public void RestartIsRefusedUnlessManaged()
+    {
+        using var t = new Temp("""{ "plugcam": { "manage": false } }""");
+        var cam = new Plugcam(new ConfigStore(t.Path), NullLogger<Plugcam>.Instance);
+        Assert.False(cam.Restart());
+        Assert.False(cam.Managed);
+        Assert.Null(cam.PhoneState());
+    }
+
+    [Fact]
+    public void PlugcamIsLeftAloneUntilManaged()
+    {
+        using var t = new Temp("""{ "plugcam": { "manage": false, "path": "C:\\nowhere\\plugcam.exe" } }""");
+        var cam = new Plugcam(new ConfigStore(t.Path), NullLogger<Plugcam>.Instance) { FindProcesses = _ => throw new Exception("not asked") };
+        cam.Tick();
+        Assert.Equal("off", cam.State);
+    }
+
+    [Fact]
+    public void AMissingPlugcamIsAnError()
+    {
+        using var t = new Temp("""{ "plugcam": { "manage": true, "path": "C:\\nowhere\\plugcam.exe" } }""");
+        var cam = new Plugcam(new ConfigStore(t.Path), NullLogger<Plugcam>.Instance) { FindProcesses = _ => [] };
+        cam.Tick();
+        Assert.Equal("error", cam.State);
+        Assert.Equal("plugcam", Plugcam.ProcessName(@"E:\app(better)\Plugcam\plugcam.exe"));
+    }
+
+    [Fact]
+    public void StopEndsPlugcamAndKeepsItClosedUntilStarted()
+    {
+        using var t = new Temp("""{ "plugcam": { "manage": true, "path": "C:\\nowhere\\plugcam.exe" } }""");
+        var self = System.Diagnostics.Process.GetCurrentProcess();
+        var running = true;
+        var ended = new List<int>();
+        var cam = new Plugcam(new ConfigStore(t.Path), NullLogger<Plugcam>.Instance)
+        {
+            FindProcesses = _ => running ? [System.Diagnostics.Process.GetProcessById(self.Id)] : [],
+            EndProcess = p => { ended.Add(p.Id); running = false; },
+        };
+        cam.Tick();
+        Assert.True(cam.Running);
+
+        Assert.True(cam.Stop());
+        Assert.Equal([self.Id], ended); // the watched copy, ended once
+        cam.Tick();
+        Assert.Equal("stopped", cam.State); // not started again by the watcher
+
+        cam.Start();
+        Assert.Equal("error", cam.State); // started again on request (the test path does not exist)
+        Assert.True(PhoneDevices.IsCommand(PhoneDevices.PlugcamStopCmd));
+    }
+
+    [Fact]
+    public void StopIsRefusedUnlessManaged()
+    {
+        using var t = new Temp("""{ "plugcam": { "manage": false } }""");
+        var cam = new Plugcam(new ConfigStore(t.Path), NullLogger<Plugcam>.Instance) { FindProcesses = _ => throw new Exception("not asked") };
+        Assert.False(cam.Stop());
+    }
+
+    [Fact]
+    public void ARunningPlugcamIsWatchedNotStartedAgain()
+    {
+        using var t = new Temp("""{ "plugcam": { "manage": true, "path": "C:\\nowhere\\plugcam.exe" } }""");
+        var self = System.Diagnostics.Process.GetCurrentProcess();
+        var cam = new Plugcam(new ConfigStore(t.Path), NullLogger<Plugcam>.Instance) { FindProcesses = _ => [self] };
+        cam.Tick();
+        Assert.Equal("running", cam.State);
+        cam.Tick();
+        Assert.True(cam.Running);
     }
 }
