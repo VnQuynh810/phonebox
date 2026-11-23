@@ -29,6 +29,9 @@ public sealed class AdbReverse(ConfigStore cfg, ILogger<AdbReverse> log, AgentEn
     // asked again now and then even when known: an app whose data was cleared has a new key and no pin, and can't say so
     internal const long KeyRefreshMs = 120_000;
 
+    /// <summary>Ends an adb server that stopped answering (see <see cref="AdbHangGuard"/>).</summary>
+    internal AdbHangGuard HangGuard { get; } = new(log);
+
     private string _lastState = "";
     private volatile string[] _devices = [];
     private volatile string[] _all = [];
@@ -38,6 +41,8 @@ public sealed class AdbReverse(ConfigStore cfg, ILogger<AdbReverse> log, AgentEn
     public string? UsbProblem => UsbDoctor.Diagnose(ChargeGuard.LastReport, Connected, DateTimeOffset.UtcNow.ToUnixTimeMilliseconds());
     private string? _lastProblem;
     public string Devices => string.Join(", ", _devices);
+    /// <summary>Connected phones after the deviceSerial filter (the phone mic picks the first one).</summary>
+    public string[] DeviceList => _devices;
     /// <summary>All attached devices, before the deviceSerial filter (for the settings page).</summary>
     public string[] AllDevices => _all;
     public event Action? StateChanged;
@@ -120,7 +125,11 @@ public sealed class AdbReverse(ConfigStore cfg, ILogger<AdbReverse> log, AgentEn
         }
 
         var serial = cfg.Get().DeviceSerial;
-        var devices = (await Adb(adb, "devices", ct))
+        string attached;
+        try { attached = await Adb(adb, "devices", ct); }
+        catch (TimeoutException) { await HangGuard.ReportAsync(true, ct); throw; }
+        await HangGuard.ReportAsync(false, ct);
+        var devices = attached
             .Split('\n').Skip(1)
             .Select(l => l.Trim().Split('\t'))
             .Where(p => p.Length == 2 && p[1] == "device")

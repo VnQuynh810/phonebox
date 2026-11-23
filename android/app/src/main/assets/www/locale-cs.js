@@ -2,6 +2,16 @@
 window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
   "cs": {
     "strings": {
+      "s.phoneMic.title": "Mikrofon telefonu",
+      "s.phoneMic.enable": "Používat mikrofon telefonu jako mikrofon počítače",
+      "s.phoneMic.hint": "Zvuk z mikrofonu telefonu se přehrává do virtuálního kabelu, například VB-CABLE; aplikace jako mikrofon vyberou druhý konec kabelu (CABLE Output). Nastavit zkontroluje kabel, stáhne scrcpy-server 5.0.1 z GitHubu, pokud chybí, a zapne mikrofon. Telefon musí být připojen přes USB. Další možnosti: Pokročilé › JSON (phoneMic).",
+      "s.phoneMic.setup": "Nastavit",
+      "s.phoneMic.settingUp": "Nastavuje se…",
+      "s.phoneMic.saveFirst": "Nejprve uložte nebo vraťte ostatní změny a pak stiskněte Nastavit.",
+      "s.phoneMic.setupFailed": "Agenta se nepodařilo zastihnout.",
+      "s.phoneMic.startMuted": "Spouštět ztlumený",
+      "s.phoneMic.toggle": "Ztlumit / zapnout zvuk",
+      "s.phoneMic.reconnects": "znovu připojeno {n}×, naposledy za {ms} ms",
       "s.feeds.import": "+ Importovat kanály (OPML / hromadně)",
       "s.feeds.importTitle": "Importovat kanály RSS / Atom",
       "s.feeds.importHint": "Importujte kanály s kategoriemi ze souboru exportu OPML (Feedly, Inoreader, NetNewsWire atd.) nebo vložte řádky (Kategorie | Název | URL, nebo Název | URL).",
@@ -1057,6 +1067,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "Built-in: turn monitors off": "Vestavěné: vypnutí monitorů",
       "Built-in: turn monitors off (X11)": "Vestavěné: vypnutí monitorů (X11)",
       "Built-in: wake a computer (Wake-on-LAN; args: MAC)": "Vestavěný: probuzení počítače (Wake- on- LAN; args: MAC)",
+      "Built-in: phone mic on / off (args: mute or unmute to set it)": "Vestavěný: mikrofon telefonu zap. / vyp. (argumenty: mute nebo unmute pro nastavení)",
       "CI fails on my pull request": "CI selže na mém pull requestu",
       "CPU": "CPU",
       "CPU load": "CPU load",
