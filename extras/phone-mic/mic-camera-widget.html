@@ -1,0 +1,133 @@
+<style>
+  :root { --ok:#22c55e; --mute:#ef4444; --warn:#f59e0b; --dim:#8a94a3; --line:rgba(255,255,255,.08); }
+  * { box-sizing:border-box; }
+  body { padding:3.5vh 3vw; display:flex; flex-direction:column; gap:3vh; user-select:none; -webkit-tap-highlight-color:transparent; }
+  .row { display:flex; align-items:center; gap:3.5vw; min-height:0; }
+  .mic { flex:1.35; }
+  .cam { flex:1; border-top:1px solid var(--line); padding-top:3vh; }
+  .big { flex:none; width:min(30vh,22vw); height:min(30vh,22vw); border-radius:50%; border:0; display:grid; place-items:center;
+         background:#1f2937; color:#fff; transition:background .2s, box-shadow .2s; box-shadow:0 0 0 0 transparent; }
+  .big svg { width:48%; height:48%; }
+  .big.live { background:var(--ok); box-shadow:0 0 0 1.2vh rgba(34,197,94,.18); }
+  .big.muted { background:var(--mute); }
+  .big.wait { background:#374151; color:var(--warn); }
+  .big:active { transform:scale(.96); }
+  .info { flex:1; min-width:0; display:flex; flex-direction:column; gap:1.4vh; }
+  .title { font-size:7.5vh; font-weight:700; line-height:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .sub { font-size:4.6vh; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .meter { display:flex; gap:.6vw; height:4.5vh; }
+  .meter i { flex:1; border-radius:2px; background:rgba(255,255,255,.08); }
+  .meter i.on { background:var(--ok); } .meter i.on.hot { background:var(--warn); } .meter i.on.clip { background:var(--mute); }
+  .camico { flex:none; width:min(16vh,12vw); height:min(16vh,12vw); border-radius:28%; display:grid; place-items:center; background:#1f2937; color:var(--dim); }
+  .camico svg { width:55%; height:55%; }
+  .camico.on { color:var(--ok); } .camico.used { background:rgba(34,197,94,.15); }
+  .btn { flex:none; border:1px solid var(--line); background:#1f2937; color:#eef2f6; font:inherit; font-size:4.4vh; padding:2.2vh 3vw; border-radius:2vh; }
+  .btn.arm { background:var(--warn); color:#111; border-color:var(--warn); }
+  .btn:active { transform:scale(.97); }
+  .dot { display:inline-block; width:2.4vh; height:2.4vh; border-radius:50%; background:var(--mute); margin-right:1vw; vertical-align:middle; }
+  .hidden { display:none !important; }
+</style>
+<div class="row mic">
+  <button class="big wait" id="mic" aria-label="Phone mic on/off">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v4M8 22h8"/><path id="slash" d="M3 3l18 18" class="hidden"/></svg>
+  </button>
+  <div class="info">
+    <div class="title" id="micTitle">Phone mic</div>
+    <div class="meter" id="meter"></div>
+    <div class="sub" id="micSub">…</div>
+  </div>
+</div>
+<div class="row cam">
+  <div class="camico" id="camIco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10l5-3v10l-5-3z"/><rect x="2" y="6" width="13" height="12" rx="2"/></svg></div>
+  <div class="info">
+    <div class="title" id="camTitle" style="font-size:6vh">Camera</div>
+    <div class="sub" id="camSub">…</div>
+  </div>
+  <button class="btn hidden" id="camStart">Start</button>
+  <button class="btn" id="camRestart">Restart</button>
+  <button class="btn" id="camStop">Stop</button>
+</div>
+<script>
+  // Shortcut ids in the agent's settings (cmd builtin:phone-mic / builtin:plugcam-start / builtin:plugcam-restart /
+  // builtin:plugcam-stop).
+  var MIC = 'phone-mic', CAM_START = 'plugcam-start', CAM_RESTART = 'plugcam-restart', CAM_STOP = 'plugcam-stop';
+  var $ = function (id) { return document.getElementById(id); };
+  var T = {
+    micOff: 'Phone mic is off',
+    enableInAgent: 'Enable it in the agent settings',
+    muted: 'Muted',
+    recording: 'Listening',
+    plugIn: 'Plug the phone in',
+    reconnecting: 'Reconnecting…',
+    tapUnmute: 'Tap to unmute',
+    noListeners: 'no app listening',
+    noMicApps: 'No app is using the mic',
+    camInUse: 'Camera in use',
+    camReady: 'Camera ready',
+    notManaged: 'Plugcam is not managed by the agent',
+    camIdle: 'Plugcam running, no app using it',
+    camNotRunning: 'Plugcam is not running',
+    starting: 'Starting Plugcam…',
+    restart: 'Restart',
+    restarting: 'Restarting Plugcam… (~5 s)',
+    tapAgain: 'Tap again',
+    stop: 'Stop',
+    stopping: 'Stopping Plugcam…',
+    using: 'In use'
+  };
+  function t(k) { return T[k]; }
+  var SEG = 16, segs = [];
+  for (var i = 0; i < SEG; i++) { var s = document.createElement('i'); $('meter').appendChild(s); segs.push(s); }
+  var last = null, pendingMute = null, pendingAt = 0;
+  function apps(list, none) { return list && list.length ? t('using') + ': ' + list.slice(0, 2).join(', ') + (list.length > 2 ? ' +' + (list.length - 2) : '') : none; }
+  function meter(db, on) {
+    // -60 dBFS .. 0 dBFS over the segments; talking sits around -30 .. -15
+    var n = on ? Math.max(0, Math.min(SEG, Math.round((db + 60) / 60 * SEG))) : 0;
+    segs.forEach(function (el, k) { el.className = k < n ? 'on' + (k >= SEG - 2 ? ' clip' : k >= SEG - 5 ? ' hot' : '') : ''; });
+  }
+  function render(s) {
+    last = s;
+    var m = s.phoneMic, c = s.plugcam, p = s.privacy || {};
+    var b = $('mic');
+    if (!m) {
+      b.className = 'big wait'; $('slash').classList.add('hidden');
+      $('micTitle').textContent = t('micOff'); $('micSub').textContent = t('enableInAgent'); meter(-90, false);
+    } else {
+      var muted = (pendingMute !== null && Date.now() - pendingAt < 3000) ? pendingMute : m.muted;
+      if (pendingMute !== null && m.muted === pendingMute) pendingMute = null;
+      var live = m.live;
+      b.className = 'big ' + (!live ? 'wait' : muted ? 'muted' : 'live');
+      $('slash').classList.toggle('hidden', !(live && muted));
+      $('micTitle').textContent = !live ? m.text : muted ? t('muted') : t('recording');
+      $('micSub').textContent = !live ? (m.state === 'waiting' ? t('plugIn') : t('reconnecting'))
+        : muted ? t('tapUnmute') + ' · ' + apps(p.micApps, t('noListeners')) : apps(p.micApps, t('noMicApps'));
+      meter(m.level, live && !muted);
+    }
+    var running = c && c.running, used = p.cameraApps && p.cameraApps.length;
+    $('camIco').className = 'camico' + (running ? ' on' : '') + (running && used ? ' used' : '');
+    $('camTitle').textContent = !c ? 'Camera' : running ? (used ? t('camInUse') : t('camReady')) : c.text;
+    $('camSub').textContent = !c ? t('notManaged') : running ? apps(p.cameraApps, t('camIdle')) : t('camNotRunning');
+    $('camStart').classList.toggle('hidden', !c || running);
+    $('camRestart').classList.toggle('hidden', !c || !running);
+    $('camStop').classList.toggle('hidden', !c || !running);
+  }
+  $('mic').onclick = function () {
+    if (!last || !last.phoneMic || !last.phoneMic.live) return;
+    pendingMute = !(pendingMute !== null ? pendingMute : last.phoneMic.muted); pendingAt = Date.now();
+    phonebox.run(MIC); render(last);
+  };
+  $('camStart').onclick = function () { phonebox.run(CAM_START); $('camSub').textContent = t('starting'); };
+  // Restart and Stop cut the camera for everyone in a call, so each takes a second tap within 4 s.
+  function twoTap(id, label, shortcut, busy) {
+    var armed = 0, timer = null, b = $(id);
+    function reset() { armed = 0; clearTimeout(timer); b.classList.remove('arm'); b.textContent = t(label); }
+    b.onclick = function () {
+      if (Date.now() - armed < 4000) { reset(); phonebox.run(shortcut); $('camSub').textContent = t(busy); return; }
+      armed = Date.now(); b.classList.add('arm'); b.textContent = t('tapAgain');
+      timer = setTimeout(reset, 4000);
+    };
+  }
+  twoTap('camRestart', 'restart', CAM_RESTART, 'restarting');
+  twoTap('camStop', 'stop', CAM_STOP, 'stopping');
+  phonebox.on('state', render);
+</script>
