@@ -24,6 +24,8 @@ public sealed class PhoneMic : BackgroundService
 {
     public const string ActionId = "builtin:phone-mic";
     internal const int ReadTimeoutMs = 2500;
+    /// <summary>How often the read loop looks at the settings (to stop when the mic is turned off or its source changes).</summary>
+    internal const int ConfigCheckMs = 1000;
 
     private readonly ConfigStore _cfg;
     private readonly AdbReverse? _adb;
@@ -302,8 +304,17 @@ public sealed class PhoneMic : BackgroundService
 
             var header = new byte[ScrcpyAudio.HeaderLength];
             var payload = new byte[64 * 1024];
-            while (!ct.IsCancellationRequested && _cfg.Get().PhoneMic.Enabled && _cfg.Get().PhoneMic.Source == c.Source)
+            // packets arrive about 50 times a second: the settings (a lock and a file check each time) are looked at once
+            // a second, so turning the mic off or changing its source still ends this stream within a second
+            var checkedAt = Environment.TickCount64;
+            while (!ct.IsCancellationRequested)
             {
+                if (Environment.TickCount64 - checkedAt >= ConfigCheckMs)
+                {
+                    checkedAt = Environment.TickCount64;
+                    var now = _cfg.Get().PhoneMic;
+                    if (!now.Enabled || now.Source != c.Source) break;
+                }
                 if (!await ReadExactly(stream, header, ct, eofOk: true)) { _log.LogInformation("phone mic: the stream ended"); break; }
                 var h = ScrcpyAudio.ParseHeader(header);
                 if (h.Length > payload.Length) payload = new byte[h.Length];
