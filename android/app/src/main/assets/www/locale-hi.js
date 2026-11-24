@@ -1068,7 +1068,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "Built-in: turn monitors off": "अंतर्निर्मित: मॉनीटर बन्द करें",
       "Built-in: turn monitors off (X11)": "अंतर्निर्मित: मॉनीटर बन्द करें (X11)",
       "Built-in: wake a computer (Wake-on-LAN; args: MAC)": "अंतर्निर्मित: कम्प्यूटर को जागाएं (Wake- on- LAN; आर्गुमेंट्स: MAC)",
-      "Built-in: phone mic on / off (args: mute or unmute to set it)": "अंतर्निर्मित: फ़ोन माइक चालू / बंद (आर्ग्युमेंट: तय करने के लिए mute या unmute)",
+      "Built-in: phone mic mute / unmute (args: mute or unmute to set it)": "अंतर्निर्मित: फ़ोन माइक म्यूट / अनम्यूट (आर्ग्युमेंट: तय करने के लिए mute या unmute)",
       "CI fails on my pull request": "CI मेरे खींचें अनुरोध पर असफल",
       "CPU": "CPU",
       "CPU load": "CPU लोड",

@@ -1068,7 +1068,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "Built-in: turn monitors off": "Вбудований: вимкнути монітори",
       "Built-in: turn monitors off (X11)": "Вбудований: вимкнути монітори (X11)",
       "Built-in: wake a computer (Wake-on-LAN; args: MAC)": "Вбудований: пробудження комп' ютера (Wake- on- LAN; аргументи: MAC)",
-      "Built-in: phone mic on / off (args: mute or unmute to set it)": "Вбудований: мікрофон телефона увімк. / вимк. (аргументи: mute або unmute, щоб задати)",
+      "Built-in: phone mic mute / unmute (args: mute or unmute to set it)": "Вбудований: вимкнути / увімкнути звук мікрофона телефона (аргументи: mute або unmute, щоб задати)",
       "CI fails on my pull request": "CI зазнала невдачі під час виконання мого запиту на витяг",
       "CPU": "CPU",
       "CPU load": "Завантаження CPU",

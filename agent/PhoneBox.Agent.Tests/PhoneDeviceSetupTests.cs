@@ -100,6 +100,25 @@ public class PhoneDeviceSetupTests : IDisposable
     }
 
     [Fact]
+    public async Task TurningTheMicOffWhileSetUpDownloadsIsNotUndone()
+    {
+        var store = new ConfigStore(_config);
+        Task<byte[]> Fetch(string url, CancellationToken ct)
+        {
+            // the user changes the settings (here: the mic stays off, with a note) while the download runs
+            var err = store.Save("""{ "phoneMic": { "enabled": false, "startMuted": true } }""", store.Version, out _);
+            Assert.Null(err);
+            return Task.FromResult(Server);
+        }
+
+        var r = await PhoneDeviceSetup.SetupMicAsync(store, Devices("CABLE Input"), Fetch, ServerSha, CancellationToken.None);
+        Assert.False(r.Ok);
+        Assert.Equal(ConfigStore.Conflict, r.Message);
+        Assert.False(store.Get().PhoneMic.Enabled);  // not switched back on
+        Assert.True(store.Get().PhoneMic.StartMuted); // and the change made meanwhile is kept
+    }
+
+    [Fact]
     public async Task TheDownloadIsCappedAtTwoMegabytes()
     {
         using var small = new HttpClient(new Answer(new ByteArrayContent(Server)));

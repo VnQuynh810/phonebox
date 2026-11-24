@@ -1068,7 +1068,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "Built-in: turn monitors off": "내장: 모니터 끄기",
       "Built-in: turn monitors off (X11)": "내장: 모니터 끄기 (X11)",
       "Built-in: wake a computer (Wake-on-LAN; args: MAC)": "내장: 컴퓨터를 깨우기 (Wake- on- LAN; arguments: MAC)",
-      "Built-in: phone mic on / off (args: mute or unmute to set it)": "기본 제공: 휴대폰 마이크 켜기 / 끄기(인수: mute 또는 unmute로 지정)",
+      "Built-in: phone mic mute / unmute (args: mute or unmute to set it)": "기본 제공: 휴대폰 마이크 음소거 / 해제(인수: mute 또는 unmute로 지정)",
       "CI fails on my pull request": "풀 요청에 CI 실패",
       "CPU": "CPU",
       "CPU load": "CPU 로드",

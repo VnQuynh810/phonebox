@@ -137,13 +137,14 @@ public sealed class PhoneMic : BackgroundService
         if (_outputFactory is null) { SetState("off", null); return; } // not on this platform
         var output = Task.Run(() => OutputLoop(ct), ct);
         var failures = 0;
+        var refused = 0; // answers in a row that the phone can't capture audio
         while (!ct.IsCancellationRequested)
         {
             var c = _cfg.Get().PhoneMic;
             if (!c.Enabled)
             {
                 // a later session after turning it back on is a first connection, not a reconnect
-                SetState("off"); failures = 0; Interlocked.Exchange(ref _lostAt, 0);
+                SetState("off"); failures = 0; refused = 0; Interlocked.Exchange(ref _lostAt, 0);
                 await Delay(1000, ct);
                 continue;
             }
@@ -171,10 +172,14 @@ public sealed class PhoneMic : BackgroundService
             catch (OperationCanceledException) when (ct.IsCancellationRequested) { break; }
             catch (PhoneMicUnsupportedException ex)
             {
-                // Android 10 and older, or a source the phone refuses: retrying soon only repeats the same answer
-                SetState("error", ex.Message + " Trying again in a minute or when another phone is plugged in.");
+                // The same answer covers a source that is only busy for a moment (another app recording) and a phone
+                // that can't capture at all (Android 10 and older): the first retry comes soon, later ones once a minute.
+                var wait = RefusedWaitMs(++refused);
+                SetState("error", ex.Message + (wait < UnsupportedRetryMs
+                    ? $" Trying again in {wait / 1000} s."
+                    : " Trying again in a minute or when another phone is plugged in."));
                 Buffer.Clear();
-                await WaitUnlessChanged(UnsupportedRetryMs, serial, c, ct);
+                await WaitUnlessChanged(wait, serial, c, ct);
                 continue;
             }
             catch (Exception ex) { SetState("error", ex.Message); }
@@ -182,6 +187,7 @@ public sealed class PhoneMic : BackgroundService
             if (_state == "live") SetState("connecting");
             // recovery is timed from the first loss, across the failed attempts that may follow it
             if (liveMs >= 0 || Interlocked.Read(ref _lostAt) == 0) Interlocked.Exchange(ref _lostAt, Environment.TickCount64);
+            if (liveMs >= 0) refused = 0;
             failures = NextFailures(failures, liveMs);
             if (failures >= 3) ForgetPhone(serial); // its copy of the server may be gone (phone reset, storage cleared)
             await Delay(RetryDelayMs(failures), ct);
@@ -192,6 +198,10 @@ public sealed class PhoneMic : BackgroundService
     /// <summary>A stream must play this long before a loss counts as a fresh start (and retries at once again).</summary>
     internal const long MinLiveMs = 2000;
     internal const int UnsupportedRetryMs = 60_000;
+    internal const int BusyRetryMs = 5000;
+
+    /// <summary>Pause after the phone's <paramref name="times"/>-th refusal in a row: short once (a busy source), then a minute.</summary>
+    internal static int RefusedWaitMs(int times) => times <= 1 ? BusyRetryMs : UnsupportedRetryMs;
 
     /// <summary>
     /// The failure count after a session that played for <paramref name="liveMs"/> (-1: never played). Only a stream

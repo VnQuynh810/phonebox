@@ -52,6 +52,9 @@ public static class PhoneDeviceSetup
     internal static async Task<Result> SetupMicAsync(ConfigStore cfg, Func<IReadOnlyList<string>> playbackDevices,
         Func<string, CancellationToken, Task<byte[]>> download, string sha256, CancellationToken ct)
     {
+        // the settings as Set up found them: a change made while the download runs (turning the mic off) makes the
+        // save below fail with the usual "settings changed" message instead of being overwritten
+        var version = cfg.Version;
         var c = cfg.Get().PhoneMic;
         var endpoint = string.IsNullOrWhiteSpace(c.Endpoint) ? new PhoneMicConfig().Endpoint : c.Endpoint;
         if (!playbackDevices().Any(d => d.Contains(endpoint, StringComparison.OrdinalIgnoreCase)))
@@ -76,7 +79,7 @@ public static class PhoneDeviceSetup
         }
         else if (have != c.ServerPath) serverPath = null;
 
-        return Save(cfg, x => { x.PhoneMic.Enabled = true; x.PhoneMic.ServerPath = serverPath; },
+        return Save(cfg, version, x => { x.PhoneMic.Enabled = true; x.PhoneMic.ServerPath = serverPath; },
             "Phone mic is on. Plug the phone in over USB; apps pick the cable's other end (for VB-CABLE: CABLE Output) as their microphone.");
     }
 
@@ -94,10 +97,10 @@ public static class PhoneDeviceSetup
         return Convert.ToHexStringLower(SHA256.HashData(f));
     }
 
-    private static Result Save(ConfigStore cfg, Action<AgentConfig> change, string message)
+    /// <summary>Saves a change made on a copy, only if the settings are still at <paramref name="version"/>.</summary>
+    private static Result Save(ConfigStore cfg, long version, Action<AgentConfig> change, string message)
     {
         // a copy: cfg.Get() is the shared, cached config, and the save may still refuse
-        var version = cfg.Version;
         var copy = JsonSerializer.Deserialize<AgentConfig>(JsonSerializer.Serialize(cfg.Get(), ConfigStore.WriteOpts), ConfigStore.WriteOpts)!;
         change(copy);
         var err = cfg.Save(JsonSerializer.Serialize(copy, ConfigStore.WriteOpts), version, out var saved);

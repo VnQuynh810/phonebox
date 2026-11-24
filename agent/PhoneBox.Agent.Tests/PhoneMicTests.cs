@@ -183,6 +183,15 @@ public sealed class PhoneMicTests
     }
 
     [Fact]
+    public void ARefusalIsRetriedSoonOnceThenOnceAMinute()
+    {
+        // codec 0 also means "the source is busy for a moment": the first retry comes after 5 s
+        Assert.Equal(PhoneMic.BusyRetryMs, PhoneMic.RefusedWaitMs(1));
+        Assert.Equal(PhoneMic.UnsupportedRetryMs, PhoneMic.RefusedWaitMs(2));
+        Assert.Equal(PhoneMic.UnsupportedRetryMs, PhoneMic.RefusedWaitMs(9));
+    }
+
+    [Fact]
     public void OnlyAStreamThatRanForAWhileStartsTheRetriesAfresh()
     {
         Assert.Equal(0, PhoneMic.NextFailures(5, PhoneMic.MinLiveMs));       // played long enough: a fresh loss

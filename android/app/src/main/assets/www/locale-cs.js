@@ -1068,7 +1068,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "Built-in: turn monitors off": "Vestavěné: vypnutí monitorů",
       "Built-in: turn monitors off (X11)": "Vestavěné: vypnutí monitorů (X11)",
       "Built-in: wake a computer (Wake-on-LAN; args: MAC)": "Vestavěný: probuzení počítače (Wake- on- LAN; args: MAC)",
-      "Built-in: phone mic on / off (args: mute or unmute to set it)": "Vestavěný: mikrofon telefonu zap. / vyp. (argumenty: mute nebo unmute pro nastavení)",
+      "Built-in: phone mic mute / unmute (args: mute or unmute to set it)": "Vestavěný: ztlumit / zapnout zvuk mikrofonu telefonu (argumenty: mute nebo unmute pro nastavení)",
       "CI fails on my pull request": "CI selže na mém pull requestu",
       "CPU": "CPU",
       "CPU load": "CPU load",

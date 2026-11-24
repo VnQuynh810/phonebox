@@ -1068,7 +1068,7 @@ window.PhoneBoxLocaleData = Object.assign(window.PhoneBoxLocaleData || {}, {
       "Built-in: turn monitors off": "内蔵: モニタをオフにする",
       "Built-in: turn monitors off (X11)": "内蔵: モニタをオフにする (X11)",
       "Built-in: wake a computer (Wake-on-LAN; args: MAC)": "内蔵:コンピュータを起動 (Wake-on-LAN; 論理: MAC)",
-      "Built-in: phone mic on / off (args: mute or unmute to set it)": "内蔵: スマホのマイクのオン / オフ(引数: mute または unmute で指定)",
+      "Built-in: phone mic mute / unmute (args: mute or unmute to set it)": "内蔵: スマホのマイクをミュート / 解除(引数: mute または unmute で指定)",
       "CI fails on my pull request": "CI は私のプル要求に失敗しました",
       "CPU": "CPU",
       "CPU load": "CPU 負荷",
